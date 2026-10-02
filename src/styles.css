@@ -1,0 +1,384 @@
+:root {
+  font-family: 'Palatino Linotype', 'Book Antiqua', Palatino, serif;
+  color: #183b32;
+  background: #f5f5f0;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  min-width: 320px;
+  min-height: 100vh;
+  margin: 0;
+  background-image: linear-gradient(180deg, #e7eee8 0, #f5f5f0 150px);
+}
+
+.page {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  padding: 32px 24px;
+  text-align: center;
+}
+.app-shell {
+  display: flex;
+  min-height: 100vh;
+}
+
+.sidebar {
+  position: sticky;
+  top: 0;
+  display: flex;
+  flex: 0 0 248px;
+  flex-direction: column;
+  gap: 38px;
+  height: 100vh;
+  padding: 28px 16px;
+  background: #183b32;
+  color: #f5f5f0;
+  text-align: left;
+}
+
+.sidebar-brand {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 0 8px;
+  font-size: 17px;
+  font-weight: 600;
+}
+
+.brand-mark {
+  display: grid;
+  flex: 0 0 36px;
+  aspect-ratio: 1;
+  place-items: center;
+  border: 1px solid #a7c0b2;
+  border-radius: 4px;
+  color: #d8e5dc;
+  font-family: Arial, sans-serif;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.sidebar-nav {
+  display: grid;
+  gap: 6px;
+}
+
+.nav-link {
+  min-height: 46px;
+  padding: 10px 12px;
+  border: 0;
+  border-left: 3px solid transparent;
+  border-radius: 3px;
+  background: transparent;
+  color: #e3ece6;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.nav-link:hover {
+  background: #ffffff12;
+}
+
+.nav-link.active {
+  border-left-color: #d8ad6a;
+  background: #ffffff18;
+  color: #fff;
+  font-weight: 600;
+}
+
+.nav-link:focus-visible {
+  outline: 2px solid #d8e5dc;
+  outline-offset: 2px;
+}
+
+
+.page-title {
+  margin: 0;
+  font-size: 36px;
+  font-weight: 600;
+  min-width: 0;
+  padding: 32px 36px;
+}
+
+.entry-area {
+  display: grid;
+  flex: 1;
+  place-items: center;
+  padding: 40px 0;
+}
+
+.entry-form {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 24px;
+  width: min(100%, 640px);
+  text-align: left;
+}
+
+.field label {
+  display: block;
+  margin-bottom: 8px;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.field input {
+  width: 100%;
+  min-height: 48px;
+  padding: 10px 12px;
+  border: 1px solid #a7b7ad;
+  border-radius: 4px;
+  background: #fff;
+  color: #183b32;
+  font: inherit;
+  text-align: left;
+}
+
+.field input:focus-visible {
+  border-color: #286650;
+  outline: 3px solid #28665033;
+  outline-offset: 2px;
+}
+
+.form-actions {
+  display: flex;
+  grid-column: 1 / -1;
+  justify-content: center;
+  margin-top: 4px;
+}
+
+.form-actions button {
+  min-width: 140px;
+  min-height: 48px;
+  padding: 10px 24px;
+  border: 0;
+  border-radius: 4px;
+  background: #183b32;
+  color: #fff;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.form-actions button:hover {
+  background: #286650;
+}
+
+.form-actions button:focus-visible {
+  outline: 3px solid #28665066;
+  outline-offset: 3px;
+}
+
+.form-actions button:disabled {
+  cursor: wait;
+  opacity: 0.7;
+}
+
+.form-status {
+  grid-column: 1 / -1;
+  min-height: 1.25em;
+  margin: -12px 0 0;
+  text-align: center;
+  font-family: Arial, sans-serif;
+  font-size: 14px;
+}
+
+.form-status.success {
+  color: #286650;
+}
+
+.form-status.error {
+  color: #a12d24;
+}
+
+.report-area {
+  display: flex;
+  width: min(100%, 800px);
+  flex-direction: column;
+  align-items: center;
+  margin: 56px auto 0;
+  text-align: center;
+}
+
+.daily-tools {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 22px;
+  width: 100%;
+  margin-bottom: 32px;
+}
+
+.daily-search,
+.spreadsheet-form {
+  display: grid;
+  grid-template-columns: minmax(0, 280px) auto;
+  align-items: end;
+  gap: 12px;
+  justify-content: center;
+  width: 100%;
+  margin: 0;
+}
+
+.daily-search button,
+.spreadsheet-form button {
+  min-width: 136px;
+  min-height: 48px;
+  padding: 10px 20px;
+  border: 0;
+  border-radius: 4px;
+  background: #183b32;
+  color: #fff;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.daily-search button:hover,
+.spreadsheet-form button:hover {
+  background: #286650;
+}
+
+.daily-search button:focus-visible,
+.spreadsheet-form button:focus-visible {
+  outline: 3px solid #28665066;
+  outline-offset: 3px;
+}
+
+.spreadsheet-feedback {
+  grid-column: 1 / -1;
+  min-height: 1.25em;
+  margin: 0;
+  font-family: Arial, sans-serif;
+  font-size: 14px;
+  text-align: center;
+}
+
+.spreadsheet-feedback.success {
+  color: #286650;
+}
+
+.spreadsheet-feedback.error {
+  color: #a12d24;
+}
+
+.report-message {
+  margin: 0;
+  color: #536b60;
+  text-align: center;
+}
+
+.report-message.error {
+  color: #a12d24;
+}
+
+.report-table-wrap {
+  width: 100%;
+  overflow-x: auto;
+}
+
+.report-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: center;
+}
+
+.report-table th,
+.report-table td {
+  padding: 14px 16px;
+  border-bottom: 1px solid #cbd6ce;
+}
+
+.report-table th {
+  color: #536b60;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+@media (max-width: 560px) {
+  .app-shell {
+    flex-direction: column;
+  }
+
+  .sidebar {
+    position: static;
+    flex-basis: auto;
+    gap: 14px;
+    height: auto;
+    padding: 14px 16px 12px;
+  }
+
+  .sidebar-brand {
+    font-size: 15px;
+  }
+
+  .brand-mark {
+    flex-basis: 32px;
+  }
+
+  .sidebar-nav {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 4px;
+  }
+
+  .nav-link {
+    min-height: 44px;
+    padding: 7px 6px;
+    border-left: 0;
+    border-bottom: 3px solid transparent;
+    font-size: 13px;
+    text-align: center;
+  }
+
+  .nav-link.active {
+    border-bottom-color: #d8ad6a;
+    border-left-color: transparent;
+  }
+
+  .page {
+    min-height: calc(100vh - 140px);
+    padding: 28px 20px;
+  }
+
+  .entry-form {
+    grid-template-columns: 1fr;
+    gap: 18px;
+  }
+
+  .report-area {
+    margin-top: 36px;
+  }
+
+  .daily-tools {
+    grid-template-columns: 1fr;
+    gap: 20px;
+    margin-bottom: 26px;
+  }
+
+  .daily-search,
+  .spreadsheet-form {
+    grid-template-columns: 1fr;
+    width: min(100%, 420px);
+    margin: 0 auto;
+  }
+
+  .daily-search button,
+  .spreadsheet-form button {
+    width: 100%;
+  }
+
+  .report-table th,
+  .report-table td {
+    padding: 12px 8px;
+    font-size: 14px;
+  }
+}
