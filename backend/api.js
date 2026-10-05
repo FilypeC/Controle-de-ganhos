@@ -1,239 +1,25 @@
-import { DatabaseSync } from 'node:sqlite';
-import { createHash, randomBytes, scryptSync, timingSafeEqual } from 'node:crypto';
+import {
+  getSessionToken,
+  getAuthenticatedAccount,
+  hashPassword,
+  hashSessionToken,
+  sessionDurationMs,
+  verifyPassword,
+} from './auth.js';
+import { clearSessionCookie, readJsonRequest, sendJson, setSessionCookie } from './http.js';
+import { calculateDailyTotals, escapeCsvCell, isValidDate } from './reports.js';
+import { createDailyWorkbook } from './workbook.js';
+import { createDatabase } from './database.js';
+import { randomBytes } from 'node:crypto';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { strToU8, zipSync } from 'fflate';
-
-const sessionCookieName = 'tabela_ganhos_session';
-const sessionDurationMs = 8 * 60 * 60 * 1000;
-
-function hashPassword(password) {
-  const salt = randomBytes(16);
-  return `scrypt$${salt.toString('hex')}$${scryptSync(password, salt, 64).toString('hex')}`;
-}
-
-function verifyPassword(password, storedHash) {
-  const [algorithm, saltHex, hashHex, ...extra] = storedHash.split('$');
-  if (
-    algorithm !== 'scrypt' ||
-    !/^[a-f\d]{32}$/i.test(saltHex || '') ||
-    !/^[a-f\d]{128}$/i.test(hashHex || '') ||
-    extra.length > 0
-  ) {
-    return false;
-  }
-
-  const actualHash = scryptSync(password, Buffer.from(saltHex, 'hex'), 64);
-  return timingSafeEqual(actualHash, Buffer.from(hashHex, 'hex'));
-}
-
-function getSessionToken(request) {
-  const cookie = String(request.headers.cookie || '')
-    .split(';')
-    .map((part) => part.trim())
-    .find((part) => part.startsWith(`${sessionCookieName}=`));
-  return cookie?.slice(sessionCookieName.length + 1) || '';
-}
-
-function hashSessionToken(token) {
-  return createHash('sha256').update(token).digest('hex');
-}
-
-function sendJson(response, statusCode, value) {
-  response.statusCode = statusCode;
-  response.end(JSON.stringify(value));
-}
-
-function setSessionCookie(response, token, request) {
-  const secure = request.socket.encrypted ? '; Secure' : '';
-  response.setHeader(
-    'Set-Cookie',
-    `${sessionCookieName}=${token}; Path=/; HttpOnly; SameSite=Strict; Max-Age=${sessionDurationMs / 1000}${secure}`,
-  );
-}
-
-function clearSessionCookie(response, request) {
-  const secure = request.socket.encrypted ? '; Secure' : '';
-  response.setHeader(
-    'Set-Cookie',
-    `${sessionCookieName}=; Path=/; HttpOnly; SameSite=Strict; Max-Age=0${secure}`,
-  );
-}
-
-function readJsonRequest(request) {
-  return new Promise((resolveBody, rejectBody) => {
-    let body = '';
-    let tooLarge = false;
-    request.setEncoding('utf8');
-    request.on('data', (chunk) => {
-      if (tooLarge) return;
-      body += chunk;
-      if (Buffer.byteLength(body) > 100_000) tooLarge = true;
-    });
-    request.on('error', rejectBody);
-    request.on('end', () => {
-      if (tooLarge) {
-        rejectBody(Object.assign(new Error('Os dados enviados são muito grandes.'), { statusCode: 413 }));
-        return;
-      }
-
-      try {
-        const values = JSON.parse(body);
-        if (values === null || typeof values !== 'object' || Array.isArray(values)) {
-          throw new Error('Os dados enviados são inválidos.');
-        }
-        resolveBody(values);
-      } catch {
-        rejectBody(Object.assign(new Error('Os dados enviados são inválidos.'), { statusCode: 400 }));
-      }
-    });
-  });
-}
-
-function escapeCsvCell(value) {
-  const text = String(value);
-  return /[;"\r\n]/.test(text) ? `"${text.replaceAll('"', '""')}"` : text;
-}
-
-function calculateDailyTotals(records, period = 'dia') {
-  return records.reduce(
-    (totals, record) => {
-      const quantity = Number(record.quantidade_entregas);
-      const note = Number(String(record.nota).replace(',', '.'));
-      const output = Number(record.saida) || 0;
-
-      if (!Number.isFinite(note)) {
-        throw new Error(`Confira a nota dos registros deste ${period}.`);
-      }
-
-      totals.quantity += quantity;
-      totals.gain += (quantity - 50) * note + output;
-      return totals;
-    },
-    { quantity: 0, gain: 0 },
-  );
-}
-
-function isValidDate(value) {
-  return (
-    typeof value === 'string' &&
-    /^\d{4}-\d{2}-\d{2}$/.test(value) &&
-    Number.isFinite(Date.parse(`${value}T00:00:00.000Z`)) &&
-    new Date(`${value}T00:00:00.000Z`).toISOString().slice(0, 10) === value
-  );
-}
-
-function createDailyWorkbook(days) {
-  const escapeXml = (value) =>
-    String(value)
-      .replaceAll('&', '&amp;')
-      .replaceAll('<', '&lt;')
-      .replaceAll('>', '&gt;')
-      .replaceAll('"', '&quot;')
-      .replaceAll("'", '&apos;');
-  const cell = (reference, value) =>
-    typeof value === 'number'
-      ? `<c r="${reference}"><v>${value}</v></c>`
-      : `<c r="${reference}" t="inlineStr"><is><t>${escapeXml(value)}</t></is></c>`;
-  const rows = [
-    ['Data', 'Quantidade de notas', 'Ganho diário'],
-    ...days.map((day) => [
-      day.data,
-      day.quantidade_entregas,
-      Math.round((day.ganho_diario + Number.EPSILON) * 100) / 100,
-    ]),
-  ];
-  const sheetRows = rows
-    .map(
-      (row, rowIndex) =>
-        `<row r="${rowIndex + 1}">${row
-          .map((value, columnIndex) => cell(`${String.fromCharCode(65 + columnIndex)}${rowIndex + 1}`, value))
-          .join('')}</row>`,
-    )
-    .join('');
-
-  return zipSync({
-    '[Content_Types].xml': strToU8(
-      '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
-        '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">' +
-        '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>' +
-        '<Default Extension="xml" ContentType="application/xml"/>' +
-        '<Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>' +
-        '<Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>' +
-        '</Types>',
-    ),
-    '_rels/.rels': strToU8(
-      '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
-        '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' +
-        '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/>' +
-        '</Relationships>',
-    ),
-    'xl/workbook.xml': strToU8(
-      '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
-        '<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" ' +
-        'xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">' +
-        '<sheets><sheet name="Ganhos diários" sheetId="1" r:id="rId1"/></sheets></workbook>',
-    ),
-    'xl/_rels/workbook.xml.rels': strToU8(
-      '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
-        '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' +
-        '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/>' +
-        '</Relationships>',
-    ),
-    'xl/worksheets/sheet1.xml': strToU8(
-      '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
-        '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">' +
-        `<sheetData>${sheetRows}</sheetData></worksheet>`,
-    ),
-  });
-}
 
 export function createApiHandler() {
     const projectRoot = fileURLToPath(new URL('../', import.meta.url));
-    const database = new DatabaseSync(
+    const database = createDatabase(
       process.env.DATABASE_PATH || resolve(projectRoot, 'entregas.db'),
     );
-    database.exec(`
-      CREATE TABLE IF NOT EXISTS entregas (
-        data DATE NOT NULL,
-        quantidade_entregas INTEGER NOT NULL CHECK (quantidade_entregas >= 0),
-        saida TIME,
-        nota TEXT
-      );
-      CREATE TABLE IF NOT EXISTS ganho_diario (
-        data DATE PRIMARY KEY,
-        quantidade_entregas INTEGER NOT NULL,
-        ganho_diario REAL NOT NULL
-      );
-      CREATE TABLE IF NOT EXISTS contas (
-        id TEXT PRIMARY KEY NOT NULL CHECK (length(trim(id)) > 0),
-        senha_hash TEXT NOT NULL,
-        tipo_conta TEXT NOT NULL CHECK (length(trim(tipo_conta)) > 0)
-      );
-      CREATE TABLE IF NOT EXISTS sessoes (
-        token_hash TEXT PRIMARY KEY NOT NULL,
-        conta_id TEXT NOT NULL REFERENCES contas(id) ON DELETE CASCADE,
-        expires_at TEXT NOT NULL
-      )
-    `);
-    database.exec('PRAGMA foreign_keys = ON');
-    database.prepare('DELETE FROM sessoes WHERE expires_at <= ?').run(new Date().toISOString());
     const dummyPasswordHash = hashPassword(randomBytes(32).toString('hex'));
-
-    function getAuthenticatedAccount(request) {
-      const token = getSessionToken(request);
-      if (!/^[a-f\d]{64}$/i.test(token)) return null;
-
-      const session = database
-        .prepare(`
-          SELECT contas.id, contas.tipo_conta, sessoes.token_hash
-          FROM sessoes
-          JOIN contas ON contas.id = sessoes.conta_id
-          WHERE sessoes.token_hash = ? AND sessoes.expires_at > ?
-        `)
-        .get(hashSessionToken(token), new Date().toISOString());
-      return session || null;
-    }
 
     const insertDelivery = database.prepare(
       'INSERT INTO entregas (data, quantidade_entregas, saida, nota) VALUES (?, ?, ?, ?)',
@@ -270,7 +56,7 @@ export function createApiHandler() {
         }
 
         if (pathname === '/api/sessao') {
-          const account = getAuthenticatedAccount(request);
+          const account = getAuthenticatedAccount(database, request);
           if (!account) {
             sendJson(response, 401, { error: 'Faça login para continuar.' });
             return;
@@ -281,7 +67,7 @@ export function createApiHandler() {
 
         let authenticatedAccountId = '';
         if (pathname === '/api/contas') {
-          const account = getAuthenticatedAccount(request);
+          const account = getAuthenticatedAccount(database, request);
           if (!account) {
             sendJson(response, 401, { error: 'Faça login para acessar as contas.' });
             return;
@@ -428,7 +214,7 @@ export function createApiHandler() {
       response.setHeader('Content-Type', 'application/json; charset=utf-8');
 
       if (pathname === '/api/entregas/periodo' && request.method === 'DELETE') {
-        const account = getAuthenticatedAccount(request);
+        const account = getAuthenticatedAccount(database, request);
         if (!account) {
           sendJson(response, 401, { error: 'Faça login para deletar dados.' });
           return;
