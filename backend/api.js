@@ -1,6 +1,7 @@
 import { DatabaseSync } from 'node:sqlite';
 import { createHash, randomBytes, scryptSync, timingSafeEqual } from 'node:crypto';
 import { resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { strToU8, zipSync } from 'fflate';
 
 const sessionCookieName = 'tabela_ganhos_session';
@@ -188,8 +189,9 @@ function createDailyWorkbook(days) {
 }
 
 export function createApiHandler() {
+    const projectRoot = fileURLToPath(new URL('../', import.meta.url));
     const database = new DatabaseSync(
-      process.env.DATABASE_PATH || resolve(process.cwd(), 'entregas.db'),
+      process.env.DATABASE_PATH || resolve(projectRoot, 'entregas.db'),
     );
     database.exec(`
       CREATE TABLE IF NOT EXISTS entregas (

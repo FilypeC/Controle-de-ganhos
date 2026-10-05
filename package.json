@@ -7,10 +7,10 @@
     "node": ">=22.5.0"
   },
   "scripts": {
-    "dev": "node server.js --dev",
-    "build": "vite build",
-    "preview": "node server.js",
-    "start": "node server.js"
+    "dev": "node server/index.js --dev",
+    "build": "vite build --config frontend/vite.config.js",
+    "preview": "node server/index.js",
+    "start": "node server/index.js"
   },
   "dependencies": {
     "fflate": "^0.8.3",

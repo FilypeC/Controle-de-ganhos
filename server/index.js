@@ -3,9 +3,11 @@ import { readFile } from 'node:fs/promises';
 import { extname, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createServer as createViteServer } from 'vite';
-import { createApiHandler } from './src/backend.js';
+import { createApiHandler } from '../backend/api.js';
 
-const projectRoot = fileURLToPath(new URL('.', import.meta.url));
+const serverDirectory = fileURLToPath(new URL('.', import.meta.url));
+const projectRoot = resolve(serverDirectory, '..');
+const frontendRoot = resolve(projectRoot, 'frontend');
 const distDirectory = resolve(projectRoot, 'dist');
 const isDevelopment = process.argv.includes('--dev');
 const port = Number(process.env.PORT || 5173);
@@ -66,8 +68,8 @@ const server = createServer((request, response) => {
 
 if (isDevelopment) {
   vite = await createViteServer({
-    configFile: resolve(projectRoot, 'vite.config.js'),
-    root: projectRoot,
+    configFile: resolve(frontendRoot, 'vite.config.js'),
+    root: frontendRoot,
     server: { middlewareMode: { server } },
     appType: 'spa',
   });
